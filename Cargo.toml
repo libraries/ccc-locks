@@ -6,7 +6,6 @@ members = [
   # detect insertion point for newly generated crates.
   # @@INSERTION_POINT@@
   "contracts/ccc-btc-lock",
-  "tests",
   "crates/ckb-lock-helper"
 ]
 
