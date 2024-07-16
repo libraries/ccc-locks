@@ -9,7 +9,7 @@ pub enum Error {
     Encoding,
     Unknown = 30,
     WrongWitnessArgs,
-    WrongPubkey,
+    WrongPubkeyHash,
     PubkeyHashMismatched,
     WrongSignatureFormat,
     InvalidRecoverId,
