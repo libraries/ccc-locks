@@ -1,3 +1,3 @@
+pub mod core;
 #[cfg(test)]
-mod tests;
-
+mod test_btc;

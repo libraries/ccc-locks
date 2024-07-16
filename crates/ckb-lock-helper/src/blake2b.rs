@@ -18,7 +18,7 @@ pub fn blake160(data: &[u8]) -> [u8; 20] {
     blake2b.update(data);
     blake2b.finalize(&mut hash);
     let mut ret = [0u8; 20];
-    (&mut ret).copy_from_slice(&hash[0..20]);
+    ret.copy_from_slice(&hash[0..20]);
     ret
 }
 
