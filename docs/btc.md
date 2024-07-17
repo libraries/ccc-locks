@@ -26,9 +26,15 @@ The corresponding witness must be a proper `WitnessArgs` data structure in
 molecule format. In the lock field of the WitnessArgs, a 65 bytes secp256k1
 signature must be present.
 
-The first byte of the signature is the `recId` described in [BIP
+The first byte of the signature is the `header` described in [BIP
 0137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki#procedure-for-signingverifying-a-signature).
-This `recId` ranges from 0 to 3. The `r` and `s` values follow it.
+The `r` and `s` values follow it. The `header` can accept following value ranges:
+- 0~3
+- 27~30 (P2PKH)
+- 39-42 (P2WPKH)
+
+They will be converted into 0~3 as `recId`.
+
 
 ## Unlocking Process
 The following bytes are hashed via SHA-256 over SHA-256 (double SHA-256):
