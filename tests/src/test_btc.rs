@@ -1,5 +1,5 @@
 use crate::core::{println_hex, println_log, Pickaxer, Resource, Verifier};
-use ckb_types::prelude::{Builder, Entity, Pack};
+use ckb_types::prelude::{Builder, Entity, Pack, Unpack};
 use sha2::Digest;
 
 static BINARY_CCC_LOCK_BTC: &[u8] = include_bytes!("../../build/release/ccc-btc-lock");
@@ -61,6 +61,46 @@ fn message_sign(msg: &str, prikey: k256::ecdsa::SigningKey) -> [u8; 65] {
     r
 }
 
+fn generate_sighash_all(
+    tx: &ckb_types::core::TransactionView,
+    dl: &Resource,
+    i: usize,
+) -> [u8; 32] {
+    let mut sighash_all_data: Vec<u8> = vec![];
+    sighash_all_data.extend(&tx.hash().raw_data());
+    let input_major_outpoint = &tx.inputs().get_unchecked(i).previous_output();
+    let input_major = &dl.cell.get(input_major_outpoint).unwrap().cell_output;
+    for input in tx.input_pts_iter().take(i) {
+        let input = &dl.cell.get(&input).unwrap().cell_output;
+        assert_ne!(input_major.lock(), input.lock());
+    }
+    let witness: ckb_types::bytes::Bytes = tx.witnesses().get_unchecked(i).unpack();
+    let witness_len = witness.len() as u64;
+    sighash_all_data.extend(&witness_len.to_le_bytes());
+    sighash_all_data.extend(&witness);
+    for input in tx.input_pts_iter().skip(i + 1) {
+        let input = &dl.cell.get(&input).unwrap().cell_output;
+        if input_major.lock() == input.lock() {
+            let witness = tx.witnesses().get_unchecked(i);
+            let witness_len = witness.len() as u64;
+            sighash_all_data.extend(&witness_len.to_le_bytes());
+            sighash_all_data.extend(&witness.as_bytes());
+        }
+    }
+    for witness in tx.witnesses().into_iter().skip(tx.inputs().len()) {
+        let witness_len = witness.len() as u64;
+        sighash_all_data.extend(&witness_len.to_le_bytes());
+        sighash_all_data.extend(&witness.as_bytes());
+    }
+    println_log(&format!(
+        "hashed {} bytes in sighash_all",
+        sighash_all_data.len()
+    ));
+    let sighash_all = blake2b(&sighash_all_data);
+    println_hex("sighash_all", &sighash_all);
+    sighash_all
+}
+
 #[test]
 fn test_success() {
     let mut dl = Resource::default();
@@ -97,32 +137,19 @@ fn test_success() {
     // Create output data
     let tx_builder = tx_builder.output_data(ckb_types::packed::Bytes::default());
     // Create witness
-    let tx_hash = tx_builder.clone().build().hash().raw_data();
-    let witness = ckb_types::packed::WitnessArgs::new_builder()
-        .lock(
-            Some(ckb_types::bytes::Bytes::copy_from_slice(&{
-                let mut sighash_all_data: Vec<u8> = vec![];
-                sighash_all_data.extend(&tx_hash);
-                let witness = ckb_types::packed::WitnessArgs::new_builder()
-                    .lock(Some(ckb_types::bytes::Bytes::from(vec![0u8; 65])).pack())
-                    .build();
-                let witness_len = witness.as_slice().len() as u64;
-                sighash_all_data.extend(&witness_len.to_le_bytes());
-                sighash_all_data.extend(&witness.as_bytes());
-                println_log(&format!(
-                    "hashed {} bytes in sighash_all",
-                    sighash_all_data.len()
-                ));
-                let sighash_all = blake2b(&sighash_all_data);
-                println_hex("sighash_all", &sighash_all);
-                let sighash_all_hex = hex::encode(&sighash_all);
-                let digest_hash = message_sign(&sighash_all_hex, prikey);
-                digest_hash
-            }))
-            .pack(),
-        )
-        .build();
-    let tx_builder = tx_builder.witness(witness.as_bytes().pack());
+    let tx_builder = tx_builder.set_witnesses(vec![ckb_types::packed::WitnessArgs::new_builder()
+        .lock(Some(ckb_types::bytes::Bytes::from(vec![0u8; 65])).pack())
+        .build()
+        .as_bytes()
+        .pack()]);
+    let sighash_all = generate_sighash_all(&tx_builder.clone().build(), &dl, 0);
+    let sighash_all_hex = hex::encode(&sighash_all);
+    let sig = message_sign(&sighash_all_hex, prikey);
+    let tx_builder = tx_builder.set_witnesses(vec![ckb_types::packed::WitnessArgs::new_builder()
+        .lock(Some(ckb_types::bytes::Bytes::copy_from_slice(&sig)).pack())
+        .build()
+        .as_bytes()
+        .pack()]);
 
     // Verify transaction
     let tx = tx_builder.build();
