@@ -45,7 +45,11 @@ pub fn entry() -> Result<(), Error> {
     if sig.len() != 65 {
         return Err(Error::WrongSignatureFormat);
     }
-    let rec_id = sig[0];
+    let rec_id = match sig[0] {
+        31 | 32 | 33 | 34 => sig[0] - 31,
+        39 | 40 | 41 | 42 => sig[0] - 39,
+        _ => sig[0],
+    };
     let rec_id = RecoveryId::try_from(rec_id).map_err(|_| Error::InvalidRecoverId)?;
     let signature = Signature::from_slice(&sig[1..]).map_err(|_| Error::WrongSignatureFormat)?;
     let recovered_key = VerifyingKey::recover_from_prehash(&msg, &signature, rec_id)
