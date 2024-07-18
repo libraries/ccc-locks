@@ -1,3 +1,4 @@
+use crate::common::println_log;
 use ckb_types::prelude::{Builder, Entity, Pack};
 
 #[derive(Clone, Default)]
@@ -84,7 +85,7 @@ impl Verifier {
         tx_resolved: &ckb_types::core::cell::ResolvedTransaction,
         dl: &Resource,
     ) -> Result<ckb_types::core::Cycle, ckb_error::Error> {
-        self.verify_prior(&tx_resolved, &dl);
+        self.verify_prior(tx_resolved, dl);
         let hardfork = ckb_types::core::hardfork::HardForks {
             ckb2021: ckb_types::core::hardfork::CKB2021::new_dev_default(),
             ckb2023: ckb_types::core::hardfork::CKB2023::new_dev_default(),
@@ -214,25 +215,4 @@ impl Pickaxer {
             .hash_type(ckb_types::core::ScriptHashType::Data1.into())
             .build()
     }
-}
-
-pub fn println_hex(name: &str, data: &[u8]) {
-    println!(
-        "Tester(........): {}(len={}): {}",
-        name,
-        data.len(),
-        hex::encode(data)
-    );
-}
-
-pub fn println_log(data: &str) {
-    println!("Tester(........): {}", data);
-}
-
-pub fn println_rtx(tx_resolved: &ckb_types::core::cell::ResolvedTransaction) {
-    let tx_json = ckb_jsonrpc_types::TransactionView::from(tx_resolved.transaction.clone());
-    println!(
-        "Tester(........): {}",
-        serde_json::to_string_pretty(&tx_json).unwrap()
-    );
 }

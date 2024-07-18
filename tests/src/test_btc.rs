@@ -1,38 +1,8 @@
-use crate::core::{println_hex, println_log, Pickaxer, Resource, Verifier};
-use ckb_types::prelude::{Builder, Entity, Pack, Unpack};
-use sha2::Digest;
+use crate::common::{assert_script_error, generate_sighash_all, println_hex, ripemd160_sha256, sha256_sha256};
+use crate::core::{Pickaxer, Resource, Verifier};
+use ckb_types::prelude::{Builder, Entity, Pack};
 
 static BINARY_CCC_LOCK_BTC: &[u8] = include_bytes!("../../build/release/ccc-btc-lock");
-
-fn blake2b(data: &[u8]) -> [u8; 32] {
-    let mut blake2b = blake2b_ref::Blake2bBuilder::new(32)
-        .personal(b"ckb-default-hash")
-        .build();
-    let mut hash = [0u8; 32];
-    blake2b.update(data);
-    blake2b.finalize(&mut hash);
-    hash
-}
-
-fn ripemd160_sha256(msg: &[u8]) -> [u8; 20] {
-    ripemd160(&sha256(msg))
-}
-
-fn ripemd160(message: &[u8]) -> [u8; 20] {
-    let mut hasher = ripemd::Ripemd160::new();
-    hasher.update(message);
-    hasher.finalize().into()
-}
-
-fn sha256(msg: &[u8]) -> [u8; 32] {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(msg);
-    hasher.finalize().into()
-}
-
-fn sha256_sha256(msg: &[u8]) -> [u8; 32] {
-    sha256(&sha256(msg))
-}
 
 fn message_hash(msg: &str) -> [u8; 32] {
     // Only 32-bytes hex representation of the hash is allowed.
@@ -61,79 +31,25 @@ fn message_sign(msg: &str, prikey: k256::ecdsa::SigningKey) -> [u8; 65] {
     r
 }
 
-fn generate_sighash_all(
-    tx: &ckb_types::core::TransactionView,
-    dl: &Resource,
-    i: usize,
-) -> [u8; 32] {
-    let mut sighash_all_data: Vec<u8> = vec![];
-    sighash_all_data.extend(&tx.hash().raw_data());
-    let input_major_outpoint = &tx.inputs().get_unchecked(i).previous_output();
-    let input_major = &dl.cell.get(input_major_outpoint).unwrap().cell_output;
-    for input in tx.input_pts_iter().take(i) {
-        let input = &dl.cell.get(&input).unwrap().cell_output;
-        assert_ne!(input_major.lock(), input.lock());
-    }
-    let witness: ckb_types::bytes::Bytes = tx.witnesses().get_unchecked(i).unpack();
-    let witness_len = witness.len() as u64;
-    sighash_all_data.extend(&witness_len.to_le_bytes());
-    sighash_all_data.extend(&witness);
-    for input in tx.input_pts_iter().skip(i + 1) {
-        let input = &dl.cell.get(&input).unwrap().cell_output;
-        if input_major.lock() == input.lock() {
-            let witness = tx.witnesses().get_unchecked(i);
-            let witness_len = witness.len() as u64;
-            sighash_all_data.extend(&witness_len.to_le_bytes());
-            sighash_all_data.extend(&witness.as_bytes());
-        }
-    }
-    for witness in tx.witnesses().into_iter().skip(tx.inputs().len()) {
-        let witness_len = witness.len() as u64;
-        sighash_all_data.extend(&witness_len.to_le_bytes());
-        sighash_all_data.extend(&witness.as_bytes());
-    }
-    println_log(&format!(
-        "hashed {} bytes in sighash_all",
-        sighash_all_data.len()
-    ));
-    let sighash_all = blake2b(&sighash_all_data);
-    println_hex("sighash_all", &sighash_all);
-    sighash_all
-}
-
-#[test]
-fn test_success() {
-    let mut dl = Resource::default();
-    let mut px = Pickaxer::default();
+fn default_tx(dl: &mut Resource, px: &mut Pickaxer) -> ckb_types::core::TransactionView {
     let tx_builder = ckb_types::core::TransactionBuilder::default();
-
     // Create prior knowledge
-    let prikey_byte: [u8; 32] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 1,
-    ];
+    let prikey_byte: [u8; 32] =
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
     let prikey = k256::ecdsa::SigningKey::from_slice(&prikey_byte).unwrap();
     let pubkey = prikey.verifying_key();
     let pubkey_hash = ripemd160_sha256(&pubkey.to_sec1_bytes());
     println_hex("pubkey_hash_expect", &pubkey_hash);
-
     // Create cell meta
-    let cell_meta_ccc_lock_btc = px.insert_cell_data(&mut dl, BINARY_CCC_LOCK_BTC);
-    let cell_meta_i = px.insert_cell_fund(
-        &mut dl,
-        px.create_script(&cell_meta_ccc_lock_btc, &pubkey_hash),
-        None,
-        &[],
-    );
+    let cell_meta_ccc_lock_btc = px.insert_cell_data(dl, BINARY_CCC_LOCK_BTC);
+    let cell_meta_i = px.insert_cell_fund(dl, px.create_script(&cell_meta_ccc_lock_btc, &pubkey_hash), None, &[]);
     // Create cell dep
     let tx_builder = tx_builder.cell_dep(px.create_cell_dep(&cell_meta_ccc_lock_btc));
     // Create input
     let tx_builder = tx_builder.input(px.create_cell_input(&cell_meta_i));
     // Create output
-    let tx_builder = tx_builder.output(px.create_cell_output(
-        px.create_script(&cell_meta_ccc_lock_btc, &pubkey_hash),
-        None,
-    ));
+    let tx_builder =
+        tx_builder.output(px.create_cell_output(px.create_script(&cell_meta_ccc_lock_btc, &pubkey_hash), None));
     // Create output data
     let tx_builder = tx_builder.output_data(ckb_types::packed::Bytes::default());
     // Create witness
@@ -150,16 +66,162 @@ fn test_success() {
         .build()
         .as_bytes()
         .pack()]);
+    tx_builder.build()
+}
 
-    // Verify transaction
-    let tx = tx_builder.build();
-    let tx_resolved = ckb_types::core::cell::resolve_transaction(
-        tx,
-        &mut std::collections::HashSet::new(),
-        &dl,
-        &dl,
-    )
-    .unwrap();
+#[test]
+fn test_success() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
     let verifier = Verifier::default();
     verifier.verify(&tx_resolved, &dl).unwrap();
+}
+
+#[test]
+fn test_success_recid_add_31() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let mut wa_lock = wa.lock().to_opt().unwrap().raw_data().to_vec();
+    wa_lock[0] += 31;
+    let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    verifier.verify(&tx_resolved, &dl).unwrap();
+}
+
+#[test]
+fn test_success_recid_add_39() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let mut wa_lock = wa.lock().to_opt().unwrap().raw_data().to_vec();
+    wa_lock[0] += 39;
+    let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    verifier.verify(&tx_resolved, &dl).unwrap();
+}
+
+#[test]
+fn test_failure_witness_args() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let wa = wa.as_builder().lock(ckb_types::packed::BytesOpt::new_builder().set(None).build()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 31);
+}
+
+#[test]
+fn test_failure_wrong_pubkey_hash() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let input_outpoint = tx.inputs().get_unchecked(0).previous_output();
+    let input_meta = dl.cell.get_mut(&input_outpoint).unwrap();
+    let input_cell_output = &input_meta.cell_output;
+    let input_cell_output_script = input_cell_output.lock();
+    let input_cell_output_script = input_cell_output_script.as_builder().args(vec![0u8; 19].pack()).build();
+    let input_cell_output = input_cell_output.clone().as_builder().lock(input_cell_output_script).build();
+    input_meta.cell_output = input_cell_output;
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 32);
+}
+
+#[test]
+fn test_failure_pubkey_hash_mismatched() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let input_outpoint = tx.inputs().get_unchecked(0).previous_output();
+    let input_meta = dl.cell.get_mut(&input_outpoint).unwrap();
+    let input_cell_output = &input_meta.cell_output;
+    let input_cell_output_script = input_cell_output.lock();
+    let input_cell_output_script = input_cell_output_script.as_builder().args(vec![0u8; 20].pack()).build();
+    let input_cell_output = input_cell_output.clone().as_builder().lock(input_cell_output_script).build();
+    input_meta.cell_output = input_cell_output;
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 33);
+}
+
+#[test]
+fn test_failure_sig_format() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let mut wa_lock = wa.lock().to_opt().unwrap().raw_data().to_vec();
+    wa_lock[0x21..0x41].copy_from_slice(&vec![0u8; 32]);
+    let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 34);
+}
+
+#[test]
+fn test_failure_recid() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let mut wa_lock = wa.lock().to_opt().unwrap().raw_data().to_vec();
+    wa_lock[0] = 4;
+    let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 35);
+}
+
+#[test]
+fn test_failure_can_not_recover() {
+    let mut dl = Resource::default();
+    let mut px = Pickaxer::default();
+    let tx = default_tx(&mut dl, &mut px);
+
+    let wa = ckb_types::packed::WitnessArgs::new_unchecked(tx.witnesses().get_unchecked(0).raw_data());
+    let mut wa_lock = wa.lock().to_opt().unwrap().raw_data().to_vec();
+    wa_lock[0] = 3 - wa_lock[0];
+    let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
+    let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
+
+    let tx_resolved =
+        ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
+    let verifier = Verifier::default();
+    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 36);
 }
