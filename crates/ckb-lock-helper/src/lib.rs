@@ -2,7 +2,6 @@
 #![no_main]
 extern crate alloc;
 pub mod blake2b;
-pub mod constant;
 pub mod error;
 
 use crate::blake2b::new_blake2b_stat;
@@ -14,6 +13,10 @@ use ckb_std::ckb_types::prelude::*;
 use ckb_std::debug;
 use ckb_std::high_level::{load_tx_hash, load_witness, load_witness_args};
 use ckb_std::syscalls::{load_input_by_field, SysError};
+
+pub fn println_hex(name: &str, data: &[u8]) {
+    debug!("{}(len={}): {}", name, data.len(), hex::encode(data));
+}
 
 pub fn generate_sighash_all() -> Result<[u8; 32], Error> {
     let mut blake2b_ctx = new_blake2b_stat();
@@ -57,10 +60,11 @@ pub fn generate_sighash_all() -> Result<[u8; 32], Error> {
             }
         }
     }
-    let mut msg = [0u8; 32];
-    debug!("Hashed {} bytes in sighash_all", blake2b_ctx.count());
-    blake2b_ctx.finalize(&mut msg);
-    Ok(msg)
+    let mut sighash_all = [0u8; 32];
+    debug!("hashed {} bytes in sighash_all", blake2b_ctx.count());
+    blake2b_ctx.finalize(&mut sighash_all);
+    println_hex("sighash_all", &sighash_all);
+    Ok(sighash_all)
 }
 
 fn calculate_inputs_len() -> Result<usize, Error> {

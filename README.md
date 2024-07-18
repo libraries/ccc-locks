@@ -9,22 +9,25 @@ dedicated chains can be found in [docs](./docs/).
 ## Build
 
 Build on native machine:
+
+```sh
+$ make build
 ```
-make build
-```
+
 See [ckb-script-templates](https://github.com/cryptape/ckb-script-templates) for required setup.
 
 
 Make a reproducible build:
+
+```sh
+$ bash scripts/reproducible_build_docker
 ```
-bash scripts/reproducible_build_docker
-```
+
 The docker is required.
 
 
 ## Test
 
+```sh
+$ cd tests && cargo test
 ```
-cd tests && cargo test
-```
-
