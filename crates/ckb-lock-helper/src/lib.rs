@@ -3,6 +3,7 @@
 extern crate alloc;
 pub mod blake2b;
 pub mod error;
+pub mod secp256k1_patch;
 
 use crate::blake2b::new_blake2b_stat;
 use crate::error::Error;
