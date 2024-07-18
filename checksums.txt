@@ -1,1 +1,1 @@
-1fc1af4aae068ffbf3efcc4bcfa80555882b3def1463ed2c33d5781056edf64f  build/release/ccc-btc-lock
+3d659b15f2aad5f9350f55ce471806c6d6ad4f51a555a82b7918e9d88f84f04a  build/release/ccc-btc-lock
