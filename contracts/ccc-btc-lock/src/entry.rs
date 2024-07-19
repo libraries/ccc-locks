@@ -1,11 +1,11 @@
 use crate::error::Error;
 use alloc::vec::Vec;
-use ckb_lock_helper::{generate_sighash_all, println_hex};
+use ckb_lock_helper::{generate_sighash_all, println_hex, secp256k1_patch::recover_from_prehash};
 use ckb_std::{
     ckb_constants::Source,
     high_level::{load_script, load_witness_args},
 };
-use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+use k256::ecdsa::{RecoveryId, Signature};
 use ripemd::{Digest, Ripemd160};
 use sha2::Sha256;
 
@@ -72,7 +72,7 @@ pub fn entry() -> Result<(), Error> {
     };
     let rec_id = RecoveryId::try_from(rec_id).map_err(|_| Error::InvalidRecoverId)?;
     let sig = Signature::from_slice(&sig_raw[1..]).map_err(|_| Error::WrongSignatureFormat)?;
-    let pubkey_result = VerifyingKey::recover_from_prehash(&digest_hash, &sig, rec_id)
+    let pubkey_result = recover_from_prehash(&digest_hash, &sig, rec_id)
         .map_err(|_| Error::CanNotRecover)?
         .to_sec1_bytes();
     assert!(pubkey_result.len() == 33);

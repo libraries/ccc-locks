@@ -86,6 +86,7 @@ dependencies = [
  "blake2b-ref",
  "ckb-std",
  "hex",
+ "k256",
 ]
 
 [[package]]
