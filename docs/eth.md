@@ -16,10 +16,8 @@ The secp256k1 pubkey hash is calculated via the following procedure(referred as 
 1. Perform a [Keccak](https://github.com/ethereum/eth-hash) hash over the uncompressed secp256k1 pubkey (64 bytes).
 2. Take the trailing 20 bytes of the hash result.
 
-
-## Supported Ethereum Addresses
-
-The secp256k1 pubkey hash can be decoded from an Ethereum address in hexadecimal format.
+The secp256k1 pubkey hash can be also decoded from an Ethereum address in
+hexadecimal format. 
 
 
 ## Witness
@@ -27,10 +25,10 @@ The corresponding witness must be a proper `WitnessArgs` data structure in
 molecule format. In the lock field of the WitnessArgs, a 65 bytes secp256k1
 signature must be present.
 
-The last byte of the signature is the `v` value described in [EIP
-155](https://eips.ethereum.org/EIPS/eip-155). This `v` can only be 27 or 28 and
-other values are rejected. The `r` and `s` values precede it. The `recId` is
-derived from `v` using the formula `v - 27`.
+The last byte of the signature is the `v` value described in Ethereum yellow paper
+(324). This `v` can only be 27 or 28 and other values are rejected. The `r` and
+`s` values precede it. The `recId` is derived from `v` using the formula `v -
+27`.
 
 ## Unlocking Process
 The following bytes are hashed via Keccak hashing:
