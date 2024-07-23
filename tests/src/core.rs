@@ -3,27 +3,16 @@ use ckb_types::prelude::{Builder, Entity, Pack};
 
 #[derive(Clone, Default)]
 pub struct Resource {
-    pub cell:
-        std::collections::HashMap<ckb_types::packed::OutPoint, ckb_types::core::cell::CellMeta>,
+    pub cell: std::collections::HashMap<ckb_types::packed::OutPoint, ckb_types::core::cell::CellMeta>,
 }
 
 impl ckb_traits::CellDataProvider for Resource {
-    fn get_cell_data(
-        &self,
-        out_point: &ckb_types::packed::OutPoint,
-    ) -> Option<ckb_types::bytes::Bytes> {
-        self.cell
-            .get(out_point)
-            .and_then(|cell_meta| cell_meta.mem_cell_data.clone())
+    fn get_cell_data(&self, out_point: &ckb_types::packed::OutPoint) -> Option<ckb_types::bytes::Bytes> {
+        self.cell.get(out_point).and_then(|cell_meta| cell_meta.mem_cell_data.clone())
     }
 
-    fn get_cell_data_hash(
-        &self,
-        out_point: &ckb_types::packed::OutPoint,
-    ) -> Option<ckb_types::packed::Byte32> {
-        self.cell
-            .get(out_point)
-            .and_then(|cell_meta| cell_meta.mem_cell_data_hash.clone())
+    fn get_cell_data_hash(&self, out_point: &ckb_types::packed::OutPoint) -> Option<ckb_types::packed::Byte32> {
+        self.cell.get(out_point).and_then(|cell_meta| cell_meta.mem_cell_data_hash.clone())
     }
 }
 
@@ -34,20 +23,13 @@ impl ckb_traits::HeaderProvider for Resource {
 }
 
 impl ckb_traits::ExtensionProvider for Resource {
-    fn get_block_extension(
-        &self,
-        _: &ckb_types::packed::Byte32,
-    ) -> Option<ckb_types::packed::Bytes> {
+    fn get_block_extension(&self, _: &ckb_types::packed::Byte32) -> Option<ckb_types::packed::Bytes> {
         unimplemented!()
     }
 }
 
 impl ckb_types::core::cell::CellProvider for Resource {
-    fn cell(
-        &self,
-        out_point: &ckb_types::packed::OutPoint,
-        eager_load: bool,
-    ) -> ckb_types::core::cell::CellStatus {
+    fn cell(&self, out_point: &ckb_types::packed::OutPoint, eager_load: bool) -> ckb_types::core::cell::CellStatus {
         let _ = eager_load;
         if let Some(data) = self.cell.get(out_point).cloned() {
             ckb_types::core::cell::CellStatus::Live(data)
@@ -58,10 +40,7 @@ impl ckb_types::core::cell::CellProvider for Resource {
 }
 
 impl ckb_types::core::cell::HeaderChecker for Resource {
-    fn check_valid(
-        &self,
-        _: &ckb_types::packed::Byte32,
-    ) -> Result<(), ckb_types::core::error::OutPointError> {
+    fn check_valid(&self, _: &ckb_types::packed::Byte32) -> Result<(), ckb_types::core::error::OutPointError> {
         Ok(())
     }
 }
@@ -70,11 +49,7 @@ impl ckb_types::core::cell::HeaderChecker for Resource {
 pub struct Verifier {}
 
 impl Verifier {
-    pub fn verify_prior(
-        &self,
-        tx_resolved: &ckb_types::core::cell::ResolvedTransaction,
-        _: &Resource,
-    ) {
+    pub fn verify_prior(&self, tx_resolved: &ckb_types::core::cell::ResolvedTransaction, _: &Resource) {
         let a = tx_resolved.transaction.outputs().item_count();
         let b = tx_resolved.transaction.outputs_data().item_count();
         assert_eq!(a, b);
@@ -90,9 +65,7 @@ impl Verifier {
             ckb2021: ckb_types::core::hardfork::CKB2021::new_dev_default(),
             ckb2023: ckb_types::core::hardfork::CKB2023::new_dev_default(),
         };
-        let consensus = ckb_chain_spec::consensus::ConsensusBuilder::default()
-            .hardfork_switch(hardfork)
-            .build();
+        let consensus = ckb_chain_spec::consensus::ConsensusBuilder::default().hardfork_switch(hardfork).build();
         let mut verifier = ckb_script::TransactionScriptsVerifier::new(
             std::sync::Arc::new(tx_resolved.clone()),
             dl.clone(),
@@ -123,21 +96,21 @@ pub struct Pickaxer {
 }
 
 impl Pickaxer {
-    pub fn insert_cell_data(
-        &mut self,
-        dl: &mut Resource,
-        data: &[u8],
-    ) -> ckb_types::core::cell::CellMeta {
-        let cell_out_point =
-            ckb_types::packed::OutPoint::new(self.outpoint_hash.clone(), self.outpoint_i);
+    pub fn insert_cell_data(&mut self, dl: &mut Resource, data: &[u8]) -> ckb_types::core::cell::CellMeta {
+        let cell_out_point = ckb_types::packed::OutPoint::new(self.outpoint_hash.clone(), self.outpoint_i);
+        let cell_output_type = ckb_types::packed::Script::new_builder()
+            .args(self.outpoint_i.to_be_bytes().pack())
+            .code_hash(ckb_chain_spec::consensus::TYPE_ID_CODE_HASH.pack())
+            .hash_type(ckb_types::core::ScriptHashType::Type.into())
+            .build();
         let cell_output = ckb_types::packed::CellOutput::new_builder()
             .capacity(ckb_types::core::Capacity::bytes(0).unwrap().pack())
+            .type_(Some(cell_output_type).pack())
             .build();
         let cell_data = ckb_types::bytes::Bytes::copy_from_slice(data);
-        let cell_meta =
-            ckb_types::core::cell::CellMetaBuilder::from_cell_output(cell_output, cell_data)
-                .out_point(cell_out_point.clone())
-                .build();
+        let cell_meta = ckb_types::core::cell::CellMetaBuilder::from_cell_output(cell_output, cell_data)
+            .out_point(cell_out_point.clone())
+            .build();
         dl.cell.insert(cell_out_point.clone(), cell_meta.clone());
         self.outpoint_i += 1;
         cell_meta
@@ -150,41 +123,29 @@ impl Pickaxer {
         kype: Option<ckb_types::packed::Script>,
         data: &[u8],
     ) -> ckb_types::core::cell::CellMeta {
-        let cell_out_point =
-            ckb_types::packed::OutPoint::new(self.outpoint_hash.clone(), self.outpoint_i);
+        let cell_out_point = ckb_types::packed::OutPoint::new(self.outpoint_hash.clone(), self.outpoint_i);
         let cell_output = ckb_types::packed::CellOutput::new_builder()
             .capacity(ckb_types::core::Capacity::bytes(0).unwrap().pack())
             .lock(lock)
-            .type_(
-                ckb_types::packed::ScriptOpt::new_builder()
-                    .set(kype)
-                    .build(),
-            )
+            .type_(ckb_types::packed::ScriptOpt::new_builder().set(kype).build())
             .build();
         let cell_data = ckb_types::bytes::Bytes::copy_from_slice(data);
-        let cell_meta =
-            ckb_types::core::cell::CellMetaBuilder::from_cell_output(cell_output, cell_data)
-                .out_point(cell_out_point.clone())
-                .build();
+        let cell_meta = ckb_types::core::cell::CellMetaBuilder::from_cell_output(cell_output, cell_data)
+            .out_point(cell_out_point.clone())
+            .build();
         dl.cell.insert(cell_out_point.clone(), cell_meta.clone());
         self.outpoint_i += 1;
         cell_meta
     }
 
-    pub fn create_cell_dep(
-        &self,
-        cell_meta: &ckb_types::core::cell::CellMeta,
-    ) -> ckb_types::packed::CellDep {
+    pub fn create_cell_dep(&self, cell_meta: &ckb_types::core::cell::CellMeta) -> ckb_types::packed::CellDep {
         ckb_types::packed::CellDep::new_builder()
             .out_point(cell_meta.out_point.clone())
             .dep_type(ckb_types::core::DepType::Code.into())
             .build()
     }
 
-    pub fn create_cell_input(
-        &self,
-        cell_meta: &ckb_types::core::cell::CellMeta,
-    ) -> ckb_types::packed::CellInput {
+    pub fn create_cell_input(&self, cell_meta: &ckb_types::core::cell::CellMeta) -> ckb_types::packed::CellInput {
         ckb_types::packed::CellInput::new(cell_meta.out_point.clone(), 0)
     }
 
@@ -196,15 +157,11 @@ impl Pickaxer {
         ckb_types::packed::CellOutput::new_builder()
             .capacity(ckb_types::core::Capacity::bytes(0).unwrap().pack())
             .lock(lock)
-            .type_(
-                ckb_types::packed::ScriptOpt::new_builder()
-                    .set(kype)
-                    .build(),
-            )
+            .type_(ckb_types::packed::ScriptOpt::new_builder().set(kype).build())
             .build()
     }
 
-    pub fn create_script(
+    pub fn create_script_by_data(
         &self,
         cell_meta: &ckb_types::core::cell::CellMeta,
         args: &[u8],
@@ -213,6 +170,18 @@ impl Pickaxer {
             .args(args.pack())
             .code_hash(cell_meta.mem_cell_data_hash.clone().unwrap())
             .hash_type(ckb_types::core::ScriptHashType::Data1.into())
+            .build()
+    }
+
+    pub fn create_script_by_type(
+        &self,
+        cell_meta: &ckb_types::core::cell::CellMeta,
+        args: &[u8],
+    ) -> ckb_types::packed::Script {
+        ckb_types::packed::Script::new_builder()
+            .args(args.pack())
+            .code_hash(cell_meta.cell_output.type_().to_opt().unwrap().calc_script_hash())
+            .hash_type(ckb_types::core::ScriptHashType::Type.into())
             .build()
     }
 }
