@@ -66,7 +66,7 @@ Outputs:
     <vec> Any cell
 Witnesses:
     <vec> WitnessArgs
-      Lock: <r, 32 bytes> <s, 32 bytes> <recId, 1 byte> 
+      Lock: <r, 32 bytes> <s, 32 bytes> <v, 1 byte> 
 ```
 
 
