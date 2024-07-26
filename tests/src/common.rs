@@ -12,6 +12,12 @@ pub fn assert_script_error(err: ckb_error::Error, err_code: i8) {
     );
 }
 
+pub fn blake160(data: &[u8]) -> [u8; 20] {
+    let mut r = [0u8; 20];
+    r.copy_from_slice(&blake2b(data)[..20]);
+    r
+}
+
 pub fn blake2b(data: &[u8]) -> [u8; 32] {
     let mut blake2b = blake2b_ref::Blake2bBuilder::new(32).personal(b"ckb-default-hash").build();
     let mut hash = [0u8; 32];

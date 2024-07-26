@@ -23,7 +23,7 @@ fn message_hash(msg: &str) -> [u8; 32] {
     sha256_sha256(&data)
 }
 
-fn message_sign(msg: &str, prikey: k256::ecdsa::SigningKey) -> [u8; 65] {
+fn message_sign(msg: &str, prikey: &k256::ecdsa::SigningKey) -> [u8; 65] {
     let m = message_hash(msg);
     let sigrec = prikey.sign_prehash_recoverable(&m).unwrap();
     let mut r = [0u8; 65];
@@ -62,7 +62,7 @@ fn default_tx(dl: &mut Resource, px: &mut Pickaxer) -> ckb_types::core::Transact
         .pack()]);
     let sighash_all = generate_sighash_all(&tx_builder.clone().build(), &dl, 0);
     let sighash_all_hex = hex::encode(&sighash_all);
-    let sig = message_sign(&sighash_all_hex, prikey);
+    let sig = message_sign(&sighash_all_hex, &prikey);
     let tx_builder = tx_builder.set_witnesses(vec![ckb_types::packed::WitnessArgs::new_builder()
         .lock(Some(ckb_types::bytes::Bytes::copy_from_slice(&sig)).pack())
         .build()
@@ -229,13 +229,13 @@ fn test_failure_can_not_recover() {
 }
 
 #[test]
-fn test_e2e() {
+fn test_success_e2e() {
     let mut dl = Resource::default();
     let mut px = Pickaxer::default();
     let tx = default_tx(&mut dl, &mut px);
 
     // 1. Install Unisat
-    // 2. Import account with private key 0x000...0001
+    // 2. Import account with private key 0x0000000000000000000000000000000000000000000000000000000000000001
     // 3. Open F12
     // 4. Run await unisat.signMessage('Signing a CKB transaction: 0xff934206c421310835b280fd6c9efd98be590f429c2a27a195b
     //        9578bde426cd0\n\nIMPORTANT: Please verify the integrity and authenticity of connected BTC wallet before si
