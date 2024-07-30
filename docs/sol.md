@@ -20,11 +20,13 @@ The corresponding witness must be a proper `WitnessArgs` data structure in molec
 
 ## Unlocking Process
 
-The following bytes are verified:
+Ed25519 messages can be of any length and does not require hashing. Specifically, for the CCC Solana lock, the message is:
 
 "Signing a CKB transaction: 0x{sigh_hash}\n\nIMPORTANT: Please verify the integrity and authenticity of connected Solana wallet before signing this message\n"
 
 The `{sighasl_all}` is replaced by `sighash_all` in hexadecimal string, with length 64. The string in the last part can be displayed in wallet UIs.
+
+For the ed25519 message, signature, and pubkey, the ed25519 verify function is used. If the verification passes, the signature is successfully verified.
 
 ## Examples
 
