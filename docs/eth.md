@@ -1,24 +1,23 @@
-# CCC BTC Lock Specification
+# CCC Ethereum Lock Specification
 This specification describes a CCC lock script that can interoperate with the
-BTC blockchain. Some common designs, definitions, and conventions can be found
+Ethereum blockchain. Some common designs, definitions, and conventions can be found
 in the [overview](./overview.md).
 
 ## Lock Script
-A CCC BTC lock script has following structure:
+A CCC Ethereum lock script has following structure:
 ```
-Code hash: CCC BTC lock script code hash
-Hash type: CCC BTC lock script hash type
+Code hash: CCC Ethereum lock script code hash
+Hash type: CCC Ethereum lock script hash type
 Args:  <secp256k1 pubkey hash, 20 bytes>
 ```
-This secp256k1 pubkey hash is calculated via SHA-256 and RIPEMD-160 over
-compressed secp256k1 pubkey(33 bytes).
 
-## Supported BTC Addresses
-The following address types are supported:
-- P2PKH
-- P2WPKH
+The secp256k1 pubkey hash is calculated via the following procedure(referred as keccak160):
 
-The secp256k1 pubkey hash can be decoded from address via base58 or bech32m(bech32).
+1. Perform a [Keccak](https://github.com/ethereum/eth-hash) hash over the uncompressed secp256k1 pubkey (64 bytes).
+2. Take the trailing 20 bytes of the hash result.
+
+The secp256k1 pubkey hash can be also decoded from an Ethereum address in
+hexadecimal format. 
 
 
 ## Witness
@@ -26,51 +25,48 @@ The corresponding witness must be a proper `WitnessArgs` data structure in
 molecule format. In the lock field of the WitnessArgs, a 65 bytes secp256k1
 signature must be present.
 
-The first byte of the signature is the `header` described in [BIP
-0137](https://github.com/bitcoin/bips/blob/master/bip-0137.mediawiki#procedure-for-signingverifying-a-signature).
-The `r` and `s` values follow it. The `header` can accept following value ranges:
-- 0~3
-- 27~30 (P2PKH)
-- 39-42 (P2WPKH)
-
-They will be converted into 0~3 as `recId`.
-
+The last byte of the signature is the `v` value described in Ethereum yellow paper
+(324). This `v` can only be 27 or 28 and other values are rejected. The `r` and
+`s` values precede it. The `recId` is derived from `v` using the formula `v -
+27`.
 
 ## Unlocking Process
-The following bytes are hashed via SHA-256 over SHA-256 (double SHA-256):
+The following bytes are hashed via Keccak hashing:
 
-1. A byte representing the length of the following string (24).
-2. A string with 24 bytes: "Bitcoin Signed Message:\n".
-3. A byte representing the length of the following string.
+1. A byte representing the length of the following string (25).
+2. A string with 25 bytes: "Ethereum Signed Message:\n".
+3. Three bytes representing the length of the following string. It is in decimal
+   string format(e.g. "155", "166"). Note that this format is different from the
+   length used in step 1.
 4. A string with bytes:
 
-"Signing a CKB transaction: 0x{sigh_hash}\n\nIMPORTANT: Please verify the integrity and authenticity of connected BTC wallet before signing this message\n"
+"Signing a CKB transaction: 0x{sigh_hash}\n\nIMPORTANT: Please verify the integrity and authenticity of connected Ethereum wallet before signing this message\n"
 
 The `{sighasl_all}` is replaced by `sighash_all` in hexadecimal string, with length 64. The
 string in the last part can be displayed in wallet UIs.
 
 After hashing, this hash value is the message used in secp256k1 verification.
-The signature with `recId` is used to recover pubkey(compressed), according to
-the message above. If the SHA-256 and RIPEMD-160 over recovered compressed
-pubkey is identical to script args, then the script is validated successfully.
+The signature with `recId` is used to recover uncompressed pubkey, according to
+the message above. If the keccak160 on uncompressed pubkey is identical to
+script args, then the script is validated successfully.
 
 ## Examples
 
 ```yaml
 CellDeps:
-    <vec> CCC BTC lock script cell
+    <vec> CCC Ethereum lock script cell
 Inputs:
     <vec> Cell
         Data: <...>
         Type: <...>
         Lock:
-            code_hash: <CCC BTC lock script code hash>
+            code_hash: <CCC Ethereum lock script code hash>
             args: <secp256k1 pubkey hash, 20 bytes>
 Outputs:
     <vec> Any cell
 Witnesses:
     <vec> WitnessArgs
-      Lock: <recId, 1 byte> <r, 32 bytes> <s, 32 bytes>
+      Lock: <r, 32 bytes> <s, 32 bytes> <v, 1 byte> 
 ```
 
 
