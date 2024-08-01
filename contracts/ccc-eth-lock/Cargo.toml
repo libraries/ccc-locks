@@ -1,0 +1,11 @@
+[package]
+name = "ccc-eth-lock"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ckb-std = "0.15"
+ckb-lock-helper = { path = "../../crates/ckb-lock-helper" }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+k256 = { version = "=0.13.1", default-features = false, features = ["arithmetic", "ecdsa", "alloc"] }
+sha3 = { version = "0.10.8", default-features = false }

@@ -12,10 +12,14 @@ pub fn assert_script_error(err: ckb_error::Error, err_code: i8) {
     );
 }
 
+pub fn blake160(data: &[u8]) -> [u8; 20] {
+    let mut r = [0u8; 20];
+    r.copy_from_slice(&blake2b(data)[..20]);
+    r
+}
+
 pub fn blake2b(data: &[u8]) -> [u8; 32] {
-    let mut blake2b = blake2b_ref::Blake2bBuilder::new(32)
-        .personal(b"ckb-default-hash")
-        .build();
+    let mut blake2b = blake2b_ref::Blake2bBuilder::new(32).personal(b"ckb-default-hash").build();
     let mut hash = [0u8; 32];
     blake2b.update(data);
     blake2b.finalize(&mut hash);
@@ -23,12 +27,7 @@ pub fn blake2b(data: &[u8]) -> [u8; 32] {
 }
 
 pub fn println_hex(name: &str, data: &[u8]) {
-    println!(
-        "Tester(........): {}(len={}): {}",
-        name,
-        data.len(),
-        hex::encode(data)
-    );
+    println!("Tester(........): {}(len={}): {}", name, data.len(), hex::encode(data));
 }
 
 pub fn println_log(data: &str) {
@@ -37,10 +36,7 @@ pub fn println_log(data: &str) {
 
 pub fn println_rtx(tx_resolved: &ckb_types::core::cell::ResolvedTransaction) {
     let tx_json = ckb_jsonrpc_types::TransactionView::from(tx_resolved.transaction.clone());
-    println!(
-        "Tester(........): {}",
-        serde_json::to_string_pretty(&tx_json).unwrap()
-    );
+    println!("Tester(........): {}", serde_json::to_string_pretty(&tx_json).unwrap());
 }
 
 pub fn ripemd160(message: &[u8]) -> [u8; 20] {
@@ -63,11 +59,7 @@ pub fn sha256_sha256(msg: &[u8]) -> [u8; 32] {
     sha256(&sha256(msg))
 }
 
-pub fn generate_sighash_all(
-    tx: &ckb_types::core::TransactionView,
-    dl: &Resource,
-    i: usize,
-) -> [u8; 32] {
+pub fn generate_sighash_all(tx: &ckb_types::core::TransactionView, dl: &Resource, i: usize) -> [u8; 32] {
     let mut sighash_all_data: Vec<u8> = vec![];
     sighash_all_data.extend(&tx.hash().raw_data());
     let input_major_outpoint = &tx.inputs().get_unchecked(i).previous_output();
@@ -94,10 +86,7 @@ pub fn generate_sighash_all(
         sighash_all_data.extend(&witness_len.to_le_bytes());
         sighash_all_data.extend(&witness.as_bytes());
     }
-    println_log(&format!(
-        "hashed {} bytes in sighash_all",
-        sighash_all_data.len()
-    ));
+    println_log(&format!("hashed {} bytes in sighash_all", sighash_all_data.len()));
     let sighash_all = blake2b(&sighash_all_data);
     println_hex("sighash_all", &sighash_all);
     sighash_all
