@@ -79,7 +79,8 @@ fn test_success() {
     let tx_resolved =
         ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
     let verifier = Verifier::default();
-    verifier.verify(&tx_resolved, &dl).unwrap();
+    let cycles = verifier.verify(&tx_resolved, &dl).unwrap();
+    assert!(cycles <= 4718592);
 }
 
 #[test]
@@ -254,4 +255,9 @@ fn test_success_e2e() {
         ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
     let verifier = Verifier::default();
     verifier.verify(&tx_resolved, &dl).unwrap();
+}
+
+#[test]
+fn test_check_size() {
+    assert!(BINARY_CCC_LOCK_BTC.len() <= 150 * 1024);
 }
