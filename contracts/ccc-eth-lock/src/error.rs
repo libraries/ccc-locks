@@ -14,7 +14,6 @@ pub enum Error {
     WrongSignatureFormat,
     InvalidRecoverId,
     CanNotRecover,
-    SignatureIsNotLowS,
 }
 
 impl From<HelperError> for Error {
