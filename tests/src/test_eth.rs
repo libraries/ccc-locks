@@ -191,7 +191,7 @@ fn test_failure_recid() {
 }
 
 #[test]
-fn test_failure_sig_use_high_s() {
+fn test_success_sig_use_high_s() {
     let mut dl = Resource::default();
     let mut px = Pickaxer::default();
     let tx = default_tx(&mut dl, &mut px);
@@ -201,13 +201,14 @@ fn test_failure_sig_use_high_s() {
     let l_s = k256::NonZeroScalar::try_from(&wa_lock[32..64]).unwrap();
     let h_s = -l_s;
     wa_lock[32..64].copy_from_slice(&h_s.to_bytes().as_slice());
+    wa_lock[64] = 55 - wa_lock[64];
     let wa = wa.as_builder().lock(Some(ckb_types::bytes::Bytes::from(wa_lock)).pack()).build();
     let tx = tx.as_advanced_builder().set_witnesses(vec![wa.as_bytes().pack()]).build();
 
     let tx_resolved =
         ckb_types::core::cell::resolve_transaction(tx, &mut std::collections::HashSet::new(), &dl, &dl).unwrap();
     let verifier = Verifier::default();
-    assert_script_error(verifier.verify(&tx_resolved, &dl).unwrap_err(), 37);
+    verifier.verify(&tx_resolved, &dl).unwrap();
 }
 
 #[test]

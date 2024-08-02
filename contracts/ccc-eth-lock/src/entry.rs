@@ -69,9 +69,6 @@ pub fn entry() -> Result<(), Error> {
     }
     let rec_id = RecoveryId::try_from(rec_id).map_err(|_| Error::InvalidRecoverId)?;
     let sig = Signature::from_slice(&sig_raw[..64]).map_err(|_| Error::WrongSignatureFormat)?;
-    if sig.normalize_s().is_some() {
-        return Err(Error::SignatureIsNotLowS);
-    }
     let pubkey_result = &recover_from_prehash(&digest_hash, &sig, rec_id)
         .map_err(|_| Error::CanNotRecover)?
         .to_encoded_point(false)
