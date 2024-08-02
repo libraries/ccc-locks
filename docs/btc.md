@@ -93,9 +93,9 @@ An implementation of the lock script spec above has been deployed to CKB mainnet
 
 | parameter   | value                                                                |
 | ----------- | -------------------------------------------------------------------- |
-| `code_hash` | TODO   |
+| `code_hash` | 0x8f026d6113b24800e04bfb33703f98dfaa6db6719097ab5d3050db9cf4fec45e   |
 | `hash_type` | `type`                                                               |
-| `tx_hash`   | TODO   |
+| `tx_hash`   | 0xba5a1a77019be0e8942119ad549f01ca3c61fd9f911aa46e27d508a802236614   |
 | `index`     | `0x0`                                                                |
 | `dep_type`  | `code`                                                               |
 
@@ -103,6 +103,9 @@ Reproducible build is supported to verify the deployed script. To build the
 deployed script above, one can use the following steps:
 
 ```bash
-TODO
+git clone https://github.com/ckb-ecofund/ccc-locks.git
+cd ccc-locks
+git checkout 87ac79
+bash scripts/reproducible_build_docker
 ```
 
