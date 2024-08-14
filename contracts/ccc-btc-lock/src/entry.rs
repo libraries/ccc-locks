@@ -1,12 +1,13 @@
 use crate::error::Error;
 use alloc::vec::Vec;
-use ckb_lock_helper::{generate_sighash_all, println_hex, secp256k1_patch::recover_from_prehash};
+use ckb_lock_helper::{generate_sighash_all, println_hex};
 use ckb_std::{
     ckb_constants::Source,
     high_level::{load_script, load_witness_args},
 };
-use k256::ecdsa::{RecoveryId, Signature};
 use ripemd::{Digest, Ripemd160};
+use secp256k1::ffi::types::AlignedType;
+use secp256k1::{self, ecdsa, Message, Secp256k1};
 use sha2::Sha256;
 
 fn ripemd160_sha256(msg: &[u8]) -> [u8; 20] {
@@ -70,11 +71,20 @@ pub fn entry() -> Result<(), Error> {
         39 | 40 | 41 | 42 => sig_raw[0] - 39,
         _ => sig_raw[0],
     };
-    let rec_id = RecoveryId::try_from(rec_id).map_err(|_| Error::InvalidRecoverId)?;
-    let sig = Signature::from_slice(&sig_raw[1..]).map_err(|_| Error::WrongSignatureFormat)?;
-    let pubkey_result = recover_from_prehash(&digest_hash, &sig, rec_id)
+
+    let mut secp_buf = [AlignedType::zeroed(); 70_000];
+    let secp = Secp256k1::preallocated_new(&mut secp_buf).unwrap();
+    let pubkey_result = secp
+        .recover_ecdsa(
+            &Message::from_digest_slice(&digest_hash).unwrap(),
+            &ecdsa::RecoverableSignature::from_compact(
+                &sig_raw[1..],
+                ecdsa::RecoveryId::from_i32(rec_id as i32).map_err(|_| Error::InvalidRecoverId)?,
+            )
+            .unwrap(),
+        )
         .map_err(|_| Error::CanNotRecover)?
-        .to_sec1_bytes();
+        .serialize();
     assert!(pubkey_result.len() == 33);
     let pubkey_hash_result = ripemd160_sha256(&pubkey_result);
     println_hex("pubkey_hash_result", pubkey_hash_result.as_ref());
